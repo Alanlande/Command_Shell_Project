@@ -1,0 +1,824 @@
+
+
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+/////////////////////////////////////////////////////////////////////////////////////
+//////////////////////////   NAME: DE LAN                  //////////////////////////
+//////////////////////////   NET ID: dl261                 //////////////////////////
+//////////////////////////   DATE: 22.NOV.2017             //////////////////////////
+//////////////////////////   INSTITUTION: DUKE UNIVERSITY  //////////////////////////
+//////////////////////////   MAJOR: ECE                    //////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////
+-------------------------------------------------------------------------------------
+-------------------------------------------------------------------------------------
+
+
+
+-----------------------------
+/////////////////////////////
+////////   PREFACE   ////////
+/////////////////////////////
+-----------------------------
+
+I chose the command shell mini-project in the final assignement. This mini project contains:
+1. myShell.cpp: The only .cpp file that contains the function 'executeComm' and 'main'.
+(1) bool executeComm(MyShell * commShell, VarMyShell * varCommShell, char ** envp):
+    Parse each command line, replace the valid variable with "$"
+    Handle special command "exit", "cd", "set" and "export";
+    Fork, execute and report the exit status.
+    
+(2) int main(int argc, char ** argv):
+    Declare a class VarMyShell to handle all the variables and values that come from command "set var value";
+    Take stdin, handle EOF and other stdin failures;
+    Declare a class MyShell, call executeComm to handle valid each command line.
+    
+2. functions.h: the .h file contains all the functions.
+(1) std::string getCurrentPath(): get and return the current path.
+    
+(2) bool checkSlash(std::string commName): check whether commName has '/' inside.
+
+(3) bool checkChar(char i): check whether the char is valid for variable name.
+
+(4) void parentProcess(pid_t chldPid): the parent process, return exit status.
+
+(5) bool checkCommand(std::string comName): check whther the command line is valid.
+
+(6) void redirWrite(std::string redirOutput): open, dup2 and close redirOutput file.
+
+(7) void redirRead(std::string redirInput): open, dup2 and close redirInput file
+
+(8) void redirMapErr(std::string redirOutErr): open, dup2 and close redirOutErr file.
+
+3. shell.h: This .h file only includes class 'MyShell'
+class 'MyShell':
+private
+    std::string commandLine: holds one command line from stdin
+    std::vector<std::string> chldPath: holds subpathes from "PATH"
+    std::vector<std::string> childArgs: holds every argument in 'commandLine'
+    std::vector<std::vector<std::string> > subChildArgs: holds args of subcommands
+    std::string redirInput: holds redirInput file name
+    std::string redirOutput: holds redirOutput file name
+    std::map<size_t, std::string> mapRedirOutErr: holds the pair of subcommand number=>redirOutErr file name
+    
+public
+    void parseCommand(): the method that parses the commandLine into childArgs
+    void parseVar(std::map<std::string, std::string> & mapEnvVar): look for '$varname' in commandline, replace with its value if found
+    bool parseRedir(): extract all the redirections, return false if invalid
+    bool parsePipe(): divide original command line into subcommand lines, return false if invalid
+    void redirR(), redirW(), redirErr(size_t n): call functions (redirRead(), redirWrite(), redirMapErr)
+    void execute(size_t i,char** envp): execute the child program
+    bool findCommName(size_t n)): return true if find the builtin cammand and expand it with absolute path if found
+    void getPath(std::string & pPathStr): get subpathes from "PATH"
+    void changeDir(): change dir if encounter command "cd"
+    bool handleSlash(size_t n, char ** envp): check whether the program name has '/', and look for the program seperately. If found, return true, else return false.
+    bool handleSingComm(pid_t * chldPid, char ** envp): if the original command line has no pipe, handle it, return false if invalid
+    bool handleMultiComm(pid_t * chldPid, size_t numSubCommand, char ** envp): if the original command line has pipes, handle them, return false if invalid
+    std::string getCommName(): return command name when the original command line has no pipe
+    std::string getCommLine(): return whole original command line
+    std::string getFirArg(): return the second argument when the original command line has no pipe
+    size_t getArgNum(): return size of chldargs
+    size_t numSubArgs(): return size of sub commands
+    The copy constructor, assignment constructor and destructor.
+
+4. varShell.h: This .h file includes class 'VarMyShell'
+(1) class 'VarMyShell':
+private
+    std::map<std::string, std::string> mapEnvArg: contain all the vars and values from command "set var value"
+    
+public
+    void parseSetArg(std::string commandLine): parse the commandLine into vars and values into std::map<std::string, std::string> setEnvArg
+    bool checkVar(std::string var): check whether var is valid 
+    void expEnvVar(std::string var): find the exported variable and export it
+    std::map<std::string, std::string> getMapArg(): return mapEnvArg
+    The copy constructor, assignment constructor and destructor.
+
+4. Makefile
+
+5. testcases: the directory contains all the test cases
+
+
+-----------------------------
+/////////////////////////////
+////////   TESTING   ////////
+/////////////////////////////
+-----------------------------
+
+----- NOTE: the contents between line **** is the printout, in parenthsis is the contents typed in -----
+
+
+Step 1
+------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------
+(1) Run ./myShell < testcases/step1/fullpathcomm.txt
+    You will see that it prints:
+    
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ checkComman:invalid commandline()
+myShell:/home/dl261/ece551/mp_miniproject$ checkComman:invalid commandline(\)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (/bin/ls)
+a.out  commandShell.txt  functions.h  Makefile myShell  myShell.cpp  myShell.o  numerics.txt  printf.c  printFun  README  save  shell.h  testcases  TESTING.txt  varShell.h
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (/usr/bin/whoami)
+dl261
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (/usr/bin/man)
+What manual page do you want?
+Program exited with status 1
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (/home/dl261/ece551/mp_miniproject/printFun)
+Yes, printf program in current PATH works!
+
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (exit)
+***********************************************************************************
+    which is correct because:
+    
+line1: nothing, then do nothing and print current directory, ask for input
+line2: (\), invalid command, ignore and ask for input
+line3,4,5,6: (/bin/ls) (/usr/bin/whoami) (/home/dl261/ece551/mp_miniproject/printFun) (/usr/bin/man), the valid full-path built-in command, execute, report exit status
+line7: (exit), exit myShell
+
+
+
+(2) Run ./myShell < testcases/step1/EOF.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ checkComman:invalid commandline(          )
+myShell:/home/dl261/ece551/mp_miniproject$
+***********************************************************************************
+    which is correct because:
+
+line1: (          ), all spaces, report invalid and ask for input
+line2: encounter end of file, exit myShell
+
+
+Step 2
+------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------
+(1) Run ./myShell < testcases/step2/allbackslash.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (\\\\\\\\\)
+Command \\\\ not found
+myShell:/home/dl261/ece551/mp_miniproject$ 
+***********************************************************************************
+    which is correct because:
+
+line1: (\\\\\\\\\), myShell would escape the char after '\', the same as bash, "\\\\" in a invalid command
+line2: encounter EOF and exit
+
+
+
+(2) Run ./myShell < testcases/step2/comm.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (ls)
+a.out					         functions.h  myShell	     myShell.o	  printf.c  README  shell.h    TESTING.txt
+commandShell.txt  Makefile     myShell.cpp  numerics.txt  printFun  save    testcases  varShell.h
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (man)
+What manual page do you want?
+Program exited with status 1
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (whoami)
+dl261
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$
+***********************************************************************************
+    which is correct because:
+
+line1-3: (ls) (man) (whoami), valid built-in commands without path, myShell would search then=m and execute if found
+line4: encounter EOF and exit
+
+
+
+(3) Run ./myShell < testcases/step2/invalidcomm.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (awdqwdqwq)
+Command awdqwdqwq not found
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (lml loqwpo)
+Command lml not found
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (eqwqwdqvqe)
+Command eqwqwdqvqe not found
+myShell:/home/dl261/ece551/mp_miniproject$
+***********************************************************************************
+    which is correct because:
+line1-3: (awdqwdqwq) (lml loqwpo) (eqwqwdqvqe), all are invalid commands without pathes, myShell can find then in "PATH"
+line4: encounter EOF and exit
+
+
+
+(4) Run ./myShell < testcases/step2/commArg.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (   ls   -l  -G -H -i)
+total 1488
+47364909 -rw-rw-r-- 1 dl261    656 Nov 16 01:44 a.out
+45355648 -rw-rw-r-- 1 dl261   5686 Nov 13 14:58 commandShell.txt
+48939595 -rw-rw-r-- 1 dl261   4221 Nov 28 22:36 functions.h
+49584985 -rw-rw-r-- 1 dl261    259 Nov 28 01:36 Makefile
+45350700 -rwxrwxr-x 1 dl261 491880 Nov 28 22:49 myShell
+46456899 -rw-rw-r-- 1 dl261   3786 Nov 28 22:49 myShell.cpp
+45355690 -rw-rw-r-- 1 dl261 907896 Nov 28 22:49 myShell.o
+45355689 -rw-rw-r-- 1 dl261   6802 Nov 13 14:58 numerics.txt
+49349322 -rw-rw-r-- 1 dl261    240 Nov 25 17:13 printf.c
+45355709 -rwxrwxr-x 1 dl261   9936 Nov 25 17:14 printFun
+45355697 -rw-rw-r-- 1 dl261   2389 Nov 13 14:58 README
+19354686 drwxrwxr-x 2 dl261   4096 Nov 28 01:55 save
+46503674 -rw-rw-r-- 1 dl261  19306 Nov 28 22:24 shell.h
+21566215 drwxrwxr-x 6 dl261    111 Nov 27 15:34 testcases
+38235599 -rw-rw-r-- 1 dl261  12446 Nov 28 23:24 #TESTING.txt#
+49544090 -rw-rw-r-- 1 dl261  11879 Nov 28 23:20 TESTING.txt
+49330668 -rw-rw-r-- 1 dl261   5310 Nov 28 22:42 varShell.h
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (   pwd -L -P)
+/home/dl261/ece551/mp_miniproject
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$
+***********************************************************************************
+    which is correct because:
+
+line1: (   ls   -l  -G -H -i), valid command with args, skip all the apaces and execute
+line2: (   pwd -L -P), valid command with args, skip all the apaces and execute
+line3: encounter EOF and exit
+
+
+
+
+(5) Run ./myShell < testcases/step2/invalidfullpathcomm.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (/bin/lsawd)
+myShell: /bin/lsawd: No such file or directory
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (/usr/bin/whoamiad aedqe)
+myShell: /usr/bin/whoamiad: No such file or directory
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (/usr/bin/mana \ \)
+myShell: /usr/bin/mana: No such file or directory
+myShell:/home/dl261/ece551/mp_miniproject$
+***********************************************************************************
+    which is correct because:
+
+line1-3: all are invalid full-path commands, myShell cannot find the commands and report invalid
+line4: encounter EOF and exit
+
+
+
+(6) Run ./myShell < testcases/step2/invalidprogram.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (/home/dl261/ece551/mp_miniproject/testcases/step2/invalidprogram -qwdqw\ \)
+myShell: /home/dl261/ece551/mp_miniproject/testcases/step2/invalidprogram: Permission denied
+Program exited with status 1
+myShell:/home/dl261/ece551/mp_miniproject$ 
+***********************************************************************************
+    which is correct because:
+
+line1: the full-path command exits, but not executable, then exceve reports Permission denied, report exit status
+line2: encounter EOF and exit
+
+
+
+(7) Run ./myShell < testcases/step2/spacebackslash.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (    ./printFun  a\ b c\ \ d)
+Yes, printf program in current PATH works!
+(a b) (c  d)
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (     ./printFun a\  b c \ d)
+Yes, printf program in current PATH works!
+(a ) (b) (c) ( d)
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (    ./printFun  1\ 2 3\ \ \ 4)
+Yes, printf program in current PATH works!
+(1 2) (3   4)
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$
+***********************************************************************************
+    which is correct because:
+
+line1-3: ./printFun is an executable program, it takes args and print out each one in parethesis, in the output we can see that myShell skipped spaces and considers '\' correctly
+line4: encounter EOF and exit
+
+
+
+
+
+Step 3
+------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------
+(1) Run ./myShell < testcases/step3/commCD.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (cd ..)
+myShell:/home/dl261/ece551$ The commandline you typed in: (cd mp_miniproject)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (cd ~)
+myShell:/home/dl261$ The commandline you typed in: (cd /home/dl261/ece551/mp_miniproject)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (cd)
+myShell:/home/dl261$ The commandline you typed in: (cd /home/dl261/ece551/mp_miniproject)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (cd ece551)
+myShell: cd: ece551: No such file or directory
+myShell:/home/dl261/ece551/mp_miniproject$
+***********************************************************************************
+    which is correct because:
+
+line1: (cd ..), cd to last directory and the directory is updated
+line2: (cd mp_miniproject) cd back
+line3: (cd ~), cd to the root
+line4: (cd /home/dl261/ece551/mp_miniproject), cd back
+line5: (cd), cd to the root
+line6: (cd /home/dl261/ece551/mp_miniproject), cd back
+line7: (cd ece551), an invalid directory
+line8: encounter EOF and exit
+
+
+
+(2) Run ./myShell < testcases/step3/setRep.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var1 -a)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var2 -l)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var3 -G)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var4 du)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var5 -k)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set VAR6 ./printFun)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var7 I am \\ \testing \ command 'set'!)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set 551 Yes, variable with digits works!)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set _559_ Yes, variable with '_' works too!)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set %var Invalid var example)
+set:(%var) is not a valid variable name!
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (export var1)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (export var7)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (export var)
+export variable: (var) NOT found!
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (env)
+XDG_SESSION_ID=24377
+TERM=xterm-256color
+SHELL=/bin/bash
+SSH_CLIENT=174.109.102.228 50548 22
+SSH_TTY=/dev/pts/76
+USER=dl261
+LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.Z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.jpg=01;35:*.jpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:
+MAIL=/var/mail/dl261
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games
+PWD=/home/dl261/ece551/mp_miniproject
+EDITOR=emacs -nw
+LANG=en_US.UTF-8
+SHLVL=1
+HOME=/home/dl261
+LOGNAME=dl261
+VISUAL=emacs -nw
+SSH_CONNECTION=174.109.102.228 50548 152.3.77.223 22
+LESSOPEN=| /usr/bin/lesspipe %s
+XDG_RUNTIME_DIR=/run/user/1059
+LESSCLOSE=/usr/bin/lesspipe %s %s
+OLDPWD=/home/dl261/ece551/mp_miniproject/testcases/step3
+_=./myShell
+var1=-a
+var7=I am \ testing  command 'set'!
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (ls $var1)
+.   a.out				         functions.h  Makefile  myShell.cpp  numerics.txt	printFun  save	   testcases	varShell.h
+..  commandShell.txt  .honor			    myShell   myShell.o	  printf.c   README		  shell.h  TESTING.txt
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (ls $var2 $var3)
+total 1488
+-rw-rw-r-- 1 dl261    656 Nov 16 01:44 a.out
+-rw-rw-r-- 1 dl261   5686 Nov 13 14:58 commandShell.txt
+-rw-rw-r-- 1 dl261   4221 Nov 28 22:36 functions.h
+-rw-rw-r-- 1 dl261    259 Nov 28 01:36 Makefile
+-rwxrwxr-x 1 dl261 491880 Nov 28 22:49 myShell
+-rw-rw-r-- 1 dl261   3786 Nov 28 22:49 myShell.cpp
+-rw-rw-r-- 1 dl261 907896 Nov 28 22:49 myShell.o
+-rw-rw-r-- 1 dl261   6802 Nov 13 14:58 numerics.txt
+-rw-rw-r-- 1 dl261    240 Nov 25 17:13 printf.c
+-rwxrwxr-x 1 dl261   9936 Nov 25 17:14 printFun
+-rw-rw-r-- 1 dl261   2389 Nov 13 14:58 README
+drwxrwxr-x 2 dl261   4096 Nov 28 01:55 save
+-rw-rw-r-- 1 dl261  19306 Nov 28 22:24 shell.h
+drwxrwxr-x 6 dl261    111 Nov 27 15:34 testcases
+-rw-rw-r-- 1 dl261  25627 Nov 29 01:22 TESTING.txt
+-rw-rw-r-- 1 dl261   5310 Nov 28 22:42 varShell.h
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (ls $var)
+a.out  commandShell.txt  functions.h  Makefile myShell  myShell.cpp  myShell.o  numerics.txt  printf.c  printFun  README  save  shell.h  testcases  TESTING.txt  varShell.h
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($var4 $var5)
+20					   ./.honor
+12					   ./testcases/step3
+32					   ./testcases/step2
+12					   ./testcases/step1
+1768					   ./testcases/step4
+1936					   ./testcases
+1820					   ./save
+5268					   .
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($VAR6 $551)
+Yes, printf program in current PATH works!
+(Yes,) (variable) (with) (digits) (works!)
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (./printFun $551 $var7)
+Yes, printf program in current PATH works!
+(Yes,) (variable) (with) (digits) (works!) (I) (am) ( testing) (command) ('set'!)
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var7 I am replacing var7 with new value!)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($VAR6 $_559_ $var7 $var)
+Yes, printf program in current PATH works!
+(Yes,) (variable) (with) ('_') (works) (too!) (I) (am) (replacing) (var7) (with) (new) (value!)
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var8 ./testcases/printfDir I am testing /testcases/printfDir!)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($var8)
+myShell: ./testcases/printfDir: No such file or directory
+myShell:/home/dl261/ece551/mp_miniproject$ checkComman:invalid commandline()
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set PATH none)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (env)
+Command env not found
+myShell:/home/dl261/ece551/mp_miniproject$ 
+***********************************************************************************
+    which is correct because:
+
+<1> After the first several "set" commands, the pairs of var=>value:
+var1=>-a
+var2=>-l
+var3=>-G
+var4=>du
+var5=>-k
+VAR6=>./printFun
+var7=>I am \\ \testing \ command 'set'!
+551=>Yes, variable with digits works!
+_559_=>Yes, variable with '_' works too!
+(%var is not a valid variable name, hence report errors!)
+
+<2> After several "export" commands, with "env" you can see the exported pairs: (var1=-a), (var7=I am \ testing  command 'set'!), var is not a var that's been set, hence not exported.
+
+<3>The following commands would be replaced with the value from existing pairs
+ls $var1(ls -a)
+ls $var(ls )
+$VAR6 $551(./printFun Yes, variable with digits works!)
+./printFun $551 $var7(./printFun Yes, variable with digits works! I am \\ \testing \ command 'set'!)
+set var7 I am replacing var7 with new value!(var7=>I am replacing var7 with new value!)
+$VAR6 $_559_ $var7 $var(./printFun Yes, variable with '_' works too! I am \\ \testing \ command 'set'! )
+set var8 ./testcases/printfDir I am testing /testcases/printfDir!(var8=>./testcases/printfDir I am testing /testcases/printfDir!)
+$var8(./testcases/printfDir I am testing /testcases/printfDir!)
+
+<4> After you "set PATH none", the PATH with value of none would be automatically exported, and "env" cannot be found.
+
+
+
+(3) Run ./myShell < testcases/step3/dollar.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($varnon)
+checkComman:invalid commandline()
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($)
+Command $ not found
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($$$)
+Command $$$ not found
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($$ $$)
+Command $$ not found
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set $\$ 1808_is_the_default_value_of_\$)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($$\$)
+Command 1808_is_the_default_value_of_$ not found
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($$ \$)
+Command $$ not found
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (\$)
+Command $ not found
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($\$)
+Command 1808 not found
+myShell:/home/dl261/ece551/mp_miniproject$ 
+***********************************************************************************
+    which is correct because:
+
+line1: ($varnon), varnon is not set yet, I would just delete it, and so command line is empty and invalid now
+line2: ($), myShell would leave "$" that is not followed by valid chars (digits, underscore, letter)
+line3,4: the same as line2
+line5: (set $\$ 1808_is_the_default_value_of_\$), myShell considers "\", and defautly has pair "$=>1808", which is the value of "$" on my server. This would make myShell save the pair: (1808=>1808_is_the_default_value_of_$)
+line6: ($$\$), This line would be replaced with ($1808), which is replaced with (1808_is_the_default_value_of_$), an invalid command
+line7,8: similiar to line6
+
+
+
+(4) Run ./myShell < testcases/step3/multiDollar1.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set root cd ~)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set out exit)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var ./printFun)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var1 var)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var2 var5)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var3 \$var2)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var4 \$var3)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var5 \$var1)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($$$var4 \$var ----- 1\ 2 3\ \ \ 4 -----)
+Yes, printf program in current PATH works!
+($var) (-----) (1 2) (3   4) (-----)
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($root)
+myShell:/home/dl261$ The commandline you typed in: ($out)
+***********************************************************************************
+    which is correct because:
+
+After line1-8, myShell will have pairs:
+root=>cd ~
+out=>exit
+var=>./printFun
+var1=>var
+var2=>var5
+var3=>$var2
+var4=>$var3
+var5=>$var1
+line9: Fisrtly, myShell will ingore the "$var" cause it is behind "\", then replace: ($$$var4) -> ($$$var3) -> ($$$var2) -> ($$var5) -> ($$var1) -> ($var) -> (./printFun), so the whole command line now is: (./printFun $var ----- 1\ 2 3\ \ \ 4 -----). The printout is correct.
+line10: ($root) will be replaced with (cd), cd to the root directory
+line11: ($out) will be replaced with (exit), exit myShell
+
+
+
+(5) Run ./myShell < testcases/step3/multiDollar2.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var ***I_should_be_replaced***)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var0 ./testcases/printDir \$var -----1\\ 2 3\\ \\ \\ 4-----a\\ b c\\ \\ d----- I am testing /testcases/printfDir!)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var1 var0)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var2 $var1)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var3 \$var0)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var4 \$var3)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var5 \$var1)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($var......invalid-chars-for-varname......$var)
+Command ***I_should_be_replaced***......invalid-chars-for-varname......***I_should_be_replaced*** not found
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($$var2)
+Yes, printfDir program in directory /testcase/ PATH works!
+(***I_should_be_replaced***) (-----1 2) (3   4-----a b) (c  d-----) (I) (am) (testing) (/testcases/printfDir!)
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($var4)
+Yes, printfDir program in directory /testcase/ PATH works!
+(***I_should_be_replaced***) (-----1 2) (3   4-----a b) (c  d-----) (I) (am) (testing) (/testcases/printfDir!)
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (\$var4)
+Command $var4 not found
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set var0 ./testcases/printDir)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($var0 \$var5 -----1\ 2 3\ \ \ 4-----a\ b c\ \ d----- I am testing /testcases/printfDir!)
+Yes, printfDir program in directory /testcase/ PATH works!
+($var5) (-----1 2) (3   4-----a b) (c  d-----) (I) (am) (testing) (/testcases/printfDir!)
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ 
+***********************************************************************************
+    which is correct because:
+
+After line1-7,  myShell will have pairs:
+var=>***I_should_be_replaced***
+var0=>./testcases/printDir $var -----1\ 2 3\ \ \ 4-----a\ b c\ \ d----- I am testing /testcases/printfDir! 《 NOTE: "\" is considered in value 》
+var1=>var0
+var2=>$var1
+var3=>$var0
+var4=>$var3
+var5=>$var1
+line8: ($var......invalid-chars-for-varname......$var). ($var) will be replaced with (***I_should_be_replaced***), which makes the commandline invalid
+line9: replace: ($$var2) -> ($$var1) -> ($var0) -> (./testcases/printDir $var -----1\ 2 3\ \ \ 4-----a\ b c\ \ d----- I am testing /testcases/printfDir!), then ($var) -> (***I_should_be_replaced***), the wholie command line is now (./testcases/printDir ***I_should_be_replaced***  -----1\ 2 3\ \ \ 4-----a\ b c\ \ d----- I am testing /testcases/printfDir!). You can see it prints out the correct answer.
+line10: (\$var4) is escaped by "\", $var4 is not a valid command, report and ask for input again.
+line11: save the pair: var0=>./testcases/printDir
+line12: the command line is replaced with (./testcases/printDir \$var5 -----1\ 2 3\ \ \ 4-----a\ b c\ \ d----- I am testing /testcases/printfDir!) and the printout is correct
+line13: encounter EOF and exit
+
+
+
+
+Step 4
+------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------
+(1) Run ./myShell < testcases/step4/testSimpleRedir.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (./testcases/printDirStep4 1 \ \ 2 \  < ./testcases/step4/inputSimple.txt A % (\ ) > ./testcases/step4/outputSimple.txt 2> ./testcases/step4/outerrSimple.txt a b c d*****)
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ 
+***********************************************************************************
+    which is correct because:
+    
+In directory:./testcases/step4/, you can find the newly created file: outputSimple.txt, outerrSimple.txt
+outerrSimple.txt: (std::cin fails!), this is correct stderr info.
+outputSimple.txt: (
+Yes, printfDir program in directory /testcase/step4 works!
+(1) (  2) ( ) (A) (%) (( )) (a) (b) (c) (d*****)
+This is the end of args.
+This is the simple input!
+This is the end of std::cin.), this is the correct output from the first program
+
+
+
+
+(2) Run ./myShell < testcases/step4/testlsWho.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (ls -a|./testcases/step4/printDirStep4 >./testcases/step4/outputLs.txt)
+std::cin fails!Program exited with status 0
+
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (who -a|./testcases/step4/printDirStep4>./testcases/step4/outputWho.txt)
+std::cin fails!Program exited with status 0
+
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$
+***********************************************************************************
+    which is correct because:
+
+In directory:./testcases/step4/, you can find the newly created file: outputLs.txt, outputWho.txt
+outputLs.txt: (
+Yes, printfDir program in directory /testcase/step4 works!
+
+This is the end of args.
+.
+..
+a.out
+commandShell.txt
+functions.h
+.honor
+Makefile
+myShell
+myShell.cpp
+myShell.o
+numerics.txt
+printf.c
+printFun
+README
+save
+shell.h
+testcases
+TESTING.txt
+varShell.h
+This is the end of std::cin.). This is exactly the output from "ls -a" in the first pipe
+
+outputWho.txt: (all the user info...That's too much, I choose not to show them all). This is exactly the output from "who -a" in the first pipe
+
+
+
+(3) Run ./myShell < testcases/step4/testLargeInput.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (stat ./testcases/step4/largeInputfile.txt)
+  File: './testcases/step4/largeInputfile.txt'
+  Size: 180000	Blocks: 352        IO Block: 4096   regular file
+Device: fc00h/64512d	Inode: 72232438    Links: 1
+Access: (0664/-rw-rw-r--)  Uid: ( 1059/   dl261)   Gid: ( 1062/   dl261)
+Access: 2017-11-27 17:06:38.485493457 -0500
+Modify: 2017-11-27 17:04:45.556094468 -0500
+Change: 2017-11-27 17:04:45.556094468 -0500
+Birth: -
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (<./testcases/step4/largeInputfile.txt ./testcases/step4/printDirStep4 1st 2>./testcases/step4/outerrLarge1.txt|./testcases/step4/printDirStep4 \ \\ \ \  2nd 2>./testcases/step4/outerrLarge2.txt|2>./testcases/step4/outerrLarge3.txt ./testcases/printDirStep4 >./testcases/step4/outputLarge.txt 3rd)
+Program exited with status 0
+Program exited with status 0
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (stat ./testcases/step4/outputLarge.txt)
+  File: './testcases/step4/outputLarge.txt'
+  Size: 180373		Blocks: 360        IO Block: 4096   regular file
+Device: fc00h/64512d	Inode: 72157916    Links: 1
+Access: (0600/-rw-------)  Uid: ( 1059/   dl261)   Gid: ( 1062/   dl261)
+Access: 2017-11-29 00:59:50.084075309 -0500
+Modify: 2017-11-29 00:59:50.132077278 -0500
+Change: 2017-11-29 00:59:50.132077278 -0500
+Birth: -
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ 
+***********************************************************************************
+    which is correct because:
+
+line1: (stat ./testcases/step4/largeInputfile.txt), from the stat info we know that largeInputfile.txt is 180000 bytes large
+line2: execute the pipe
+line3: (stat ./testcases/step4/outputLarge.txt), we can see the outputLarge.txt created is 180373 bytes large, which means that the pipe is correctly implemented
+And in directory:./testcases/step4/, you can find the newly created file: outerrLarge1.txt, outerrLarge2.txt, outerrLarge3.txt, outputLarge.txt, in which there are correct contents we expect
+
+
+
+(4) Run ./myShell < testcases/step4/testInvalidPipe.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (./testcases/step4/printDirStep4 HELLO < ./testcases/step4/input2.txt | ./testcases/printDirStep4 < ./testcases/step4/input2.txt| ./testcases/step4/printDirStep4 > ./testcases/step4/outputInvalid11.txt 2> ./testcases/step4/outerrInvalid11.txt AO h)
+The redirection is invalid!
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (>./testcases/step4/outputInvalid21.txt ./testcases/step4/printDirStep4<./testcases/step4/input1.txt|./testcases/step4/printDirStep4 2>./testcases/step4/outerrInvalid21.txt >./testcases/step4/outputInvalid22.txt)
+The redirection is invalid!
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (./testcases/step4/printDirStep4 HELLO < ./testcases/step4/input2.txt | ./testcases/step4/printDirStep4 HELLO|<./testcases/step4/input2.txt ./testcases/step4/printDirStep4 > ./testcases/step4/outputInvalid31.txt 2>./testcases/step4/outputInvalid31.txt)
+The redirection is invalid!
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (./testcases/step4/printDirStep4 HELLO < ./testcases/step4/input2.txt | ./testcases/printDirStep4>./testcases/step4/outputInvalid41.txt| ./testcases/step4/printDirStep4 > ./testcases/step4/outputInvalid42.txt 2> ./testcases/step4/outerrInvalid41.txt AO h)
+The redirection is invalid!
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (./testcases/step4/printDirStep4 HELLO<| ./testcases/printDirStep4>./testcases/step4/outputInvalid41.txt| ./testcases/step4/printDirStep4 > ./testcases/step4/outputInvalid42.txt 2> ./testcases/step4/outerrInvalid41.txt AO h)
+The redirection is invalid!
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (./testcases/step4/printDirStep4 HELLO < ./testcases/step4/input2.txt |./testcases/printDirStep4 2>|./testcases/step4/printDirStep4 > ./testcases/step4/outputInvalid42.txt 2> ./testcases/step4/outerrInvalid41.txt AO h)
+The redirection is invalid!
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (./testcases/step4/printDirStep4 HELLO < ./testcases/step4/input2.txt 2>| ./testcases/step4/printDirStep4 HELLO |./testcases/step4/printDirStep4 > ./testcases/step4/outputInvalid42.txt 2> ./testcases/step4/outerrInvalid41.txt AO h)
+The redirection is invalid!
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (./testcases/step4/printDirStep4 HELLO < ./testcases/step4/input2.txt |./testcases/printDirStep4 >|./testcases/step4/printDirStep4 > ./testcases/step4/outputInvalid42.txt 2> ./testcases/step4/outerrInvalid41.txt AO h)
+The redirection is invalid!
+myShell:/home/dl261/ece551/mp_miniproject$ 
+***********************************************************************************
+    which is correct because:
+
+All the 4 pipe implementations include invalid redirections in ways like:
+line1: (   |  < |   )
+line2: ( > |    |   )
+line3: (   |    | < )
+line4: (   |  > |   )
+line5: (  <|    |   )
+line6: (   |  2>|   )
+line7: ( 2>|    |   )
+line8: (   |   >|   )
+So myShell would not execute but report errors.
+
+
+
+(5) Run ./myShell < testcases/step4/testValidPipe.txt
+    You will see that it prints:
+    
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (./testcases/step4/printDirStep4<./testcases/step4/input1.txt 2>./testcases/step4/outerr11.txt a b c d \ \ e\   |./testcases/step4/printDirStep4 1 2 3 2>./testcases/step4/outerr12.txt| ./testcases/step4/printDirStep4 > ./testcases/step4/output1.txt 2>./testcases/step4/outerr13.txt A BC)
+Program exited with status 0
+Program exited with status 0
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (./testcases/step4/printDirStep4 HELLO < ./testcases/step4/input2.txt|./testcases/printDirStep4 2>./testcases/step4/outerr21.txt| ./testcases/step4/printDirStep4>output2.txt 2>./testcases/step4/outerr22.txt AO h >./testcases/step4/output2.txt)
+std::cin fails!
+Program exited with status 0
+Program exited with status 0
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ 
+***********************************************************************************
+    which is correct because:
+
+In directory:./testcases/step4/, you can find the newly created file: outerr11.txt, outerr12.txt, output1.txt, outerr13.txt, outerr21.txt, output2.txt, outerr22.txt, output2.txt, in which there are correct contents we expect. Note that there is a "std::cin fails!" after the second input command line, because I did not include "2>" in the first pipe, then the stderr would be direcly printed out
+
+
+
+The combined testcases:
+------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------
+------------------------------------------------------------------------------------------------------------
+
+(1) Run ./myShell < testcases/combined/test1.txt
+    You will see that it prints:
+
+***********************************************************************************
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set myProgram ./testcases/step4/printDirStep4)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set inFile ./testcases/step4/input1.txt)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (set outFile ./testcases/combined/output1.txt)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (export myProgram)
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (export pipe)
+export variable: (pipe) NOT found!
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: ($myProgram<$inFile| 2>./testcases/combined/outerr1.txt>$outFile $myProgram)
+std::cin fails!
+Program exited with status 0
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ The commandline you typed in: (env)
+XDG_SESSION_ID=24824
+TERM=xterm-256color
+SHELL=/bin/bash
+SSH_CLIENT=10.197.117.224 54155 22
+SSH_TTY=/dev/pts/7
+USER=dl261
+LS_COLORS=rs=0:di=01;34:ln=01;36:mh=00:pi=40;33:so=01;35:do=01;35:bd=40;33;01:cd=40;33;01:or=40;31;01:mi=00:su=37;41:sg=30;43:ca=30;41:tw=30;42:ow=34;42:st=37;44:ex=01;32:*.tar=01;31:*.tgz=01;31:*.arc=01;31:*.arj=01;31:*.taz=01;31:*.lha=01;31:*.lz4=01;31:*.lzh=01;31:*.lzma=01;31:*.tlz=01;31:*.txz=01;31:*.tzo=01;31:*.t7z=01;31:*.zip=01;31:*.z=01;31:*.Z=01;31:*.dz=01;31:*.gz=01;31:*.lrz=01;31:*.lz=01;31:*.lzo=01;31:*.xz=01;31:*.bz2=01;31:*.bz=01;31:*.tbz=01;31:*.tbz2=01;31:*.tz=01;31:*.deb=01;31:*.rpm=01;31:*.jar=01;31:*.war=01;31:*.ear=01;31:*.sar=01;31:*.rar=01;31:*.alz=01;31:*.ace=01;31:*.zoo=01;31:*.cpio=01;31:*.7z=01;31:*.rz=01;31:*.cab=01;31:*.jpg=01;35:*.jpeg=01;35:*.gif=01;35:*.bmp=01;35:*.pbm=01;35:*.pgm=01;35:*.ppm=01;35:*.tga=01;35:*.xbm=01;35:*.xpm=01;35:*.tif=01;35:*.tiff=01;35:*.png=01;35:*.svg=01;35:*.svgz=01;35:*.mng=01;35:*.pcx=01;35:*.mov=01;35:*.mpg=01;35:*.mpeg=01;35:*.m2v=01;35:*.mkv=01;35:*.webm=01;35:*.ogm=01;35:*.mp4=01;35:*.m4v=01;35:*.mp4v=01;35:*.vob=01;35:*.qt=01;35:*.nuv=01;35:*.wmv=01;35:*.asf=01;35:*.rm=01;35:*.rmvb=01;35:*.flc=01;35:*.avi=01;35:*.fli=01;35:*.flv=01;35:*.gl=01;35:*.dl=01;35:*.xcf=01;35:*.xwd=01;35:*.yuv=01;35:*.cgm=01;35:*.emf=01;35:*.ogv=01;35:*.ogx=01;35:*.aac=00;36:*.au=00;36:*.flac=00;36:*.m4a=00;36:*.mid=00;36:*.midi=00;36:*.mka=00;36:*.mp3=00;36:*.mpc=00;36:*.ogg=00;36:*.ra=00;36:*.wav=00;36:*.oga=00;36:*.opus=00;36:*.spx=00;36:*.xspf=00;36:
+MAIL=/var/mail/dl261
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/usr/games:/usr/local/games
+PWD=/home/dl261/ece551/mp_miniproject
+EDITOR=emacs -nw
+LANG=en_US.UTF-8
+SHLVL=1
+HOME=/home/dl261
+LOGNAME=dl261
+VISUAL=emacs -nw
+SSH_CONNECTION=10.197.117.224 54155 152.3.77.223 22
+LESSOPEN=| /usr/bin/lesspipe %s
+XDG_RUNTIME_DIR=/run/user/1059
+LESSCLOSE=/usr/bin/lesspipe %s %s
+OLDPWD=/home/dl261/ece551/mp_miniproject/testcases/combined
+_=./myShell
+myProgram=./testcases/step4/printDirStep4
+Program exited with status 0
+myShell:/home/dl261/ece551/mp_miniproject$ 
+***********************************************************************************
+    which is correct because:
+
+After line1-3, myShell has pairs:
+myProgram=>./testcases/step4/printDirStep4
+inFile=>./testcases/step4/input1.txt
+outFile=>./testcases/combined/output1.txt
+line4: (export myProgram), (myProgram=>./testcases/step4/printDirStep4) will be exported
+line5: (export pipe), pipe is not a set variable, export would report error
+line6: ($myProgram<$inFile| 2>./testcases/combined/outerr1.txt>$outFile $myProgram) will be replaced with (./testcases/step4/printDirStep4<./testcases/step4/input1.txt| 2>./testcases/combined/outerr1.txt>./testcases/combined/output1.txt ./testcases/step4/printDirStep4), then in directory ./testcases/combined/, you can find the newly created file: output1.txt, outerr1.txt, in which there are contents we expect. Note that there is a "std::cin fails!" after the 6th input command line, because I did not include "2>" in the first pipe, then the stderr would be direcly printed out.
+line7: (env), we can see "myProgram=./testcases/step4/printDirStep4", the exported var=value.
