@@ -1,0 +1,3 @@
+stat ./testcases/step4/largeInputfile.txt
+<./testcases/step4/largeInputfile.txt ./testcases/step4/printDirStep4 1st 2>./testcases/step4/outerrLarge1.txt|./testcases/step4/printDirStep4 \ \\ \ \  2nd 2>./testcases/step4/outerrLarge2.txt|2>./testcases/step4/outerrLarge3.txt ./testcases/printDirStep4 >./testcases/step4/outputLarge.txt 3rd
+stat ./testcases/step4/outputLarge.txt

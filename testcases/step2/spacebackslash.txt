@@ -1,0 +1,3 @@
+    ./printFun  a\ b c\ \ d
+     ./printFun a\  b c \ d
+    ./printFun  1\ 2 3\ \ \ 4

@@ -1,0 +1,2 @@
+./testcases/step4/printDirStep4<./testcases/step4/input1.txt 2>./testcases/step4/outerr11.txt a b c d \ \ e\   |./testcases/step4/printDirStep4 1 2 3 2>./testcases/step4/outerr12.txt| ./testcases/step4/printDirStep4 > ./testcases/step4/output1.txt 2>./testcases/step4/outerr13.txt A BC
+./testcases/step4/printDirStep4 HELLO < ./testcases/step4/input2.txt|./testcases/printDirStep4 2>./testcases/step4/outerr21.txt| ./testcases/step4/printDirStep4>output2.txt 2>./testcases/step4/outerr22.txt AO h >./testcases/step4/output2.txt

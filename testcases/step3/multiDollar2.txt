@@ -1,0 +1,13 @@
+set var ***I_should_be_replaced***
+set var0 ./testcases/printDir \$var -----1\\ 2 3\\ \\ \\ 4-----a\\ b c\\ \\ d----- I am testing /testcases/printfDir!
+set var1 var0
+set var2 $var1
+set var3 \$var0
+set var4 \$var3
+set var5 \$var1
+$var......invalid-chars-for-varname......$var
+$$var2
+$var4
+\$var4
+set var0 ./testcases/printDir
+$var0 \$var5 -----1\ 2 3\ \ \ 4-----a\ b c\ \ d----- I am testing /testcases/printfDir!

@@ -1,0 +1,2 @@
+ls -a|./testcases/step4/printDirStep4 >./testcases/step4/outputLs.txt
+who -a|./testcases/step4/printDirStep4>./testcases/step4/outputWho.txt

@@ -1,0 +1,3 @@
+/bin/lsawd
+/usr/bin/whoamiad aedqe
+/usr/bin/mana \ \

@@ -1,0 +1,7 @@
+cd ..
+cd mp_miniproject
+cd ~
+cd /home/dl261/ece551/mp_miniproject
+cd
+cd /home/dl261/ece551/mp_miniproject
+cd ece551

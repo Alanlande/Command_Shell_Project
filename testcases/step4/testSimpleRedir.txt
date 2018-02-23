@@ -1,0 +1,1 @@
+./testcases/printDirStep4 1 \ \ 2 \  < ./testcases/step4/inputSimple.txt A % (\ ) > ./testcases/step4/outputSimple.txt 2> ./testcases/step4/outerrSimple.txt a b c d*****

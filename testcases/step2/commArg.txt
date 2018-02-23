@@ -1,0 +1,2 @@
+   ls   -l  -G -H -i
+   pwd -L -P

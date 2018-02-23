@@ -1,0 +1,27 @@
+set var1 -a
+set var2 -l
+set var3 -G
+set var4 du
+set var5 -k
+set VAR6 ./printFun
+set var7 I am \\ \testing \ command 'set'!
+set 551 Yes, variable with digits works!
+set _559_ Yes, variable with '_' works too!
+set %var Invalid var example
+export var1
+export var7
+export var
+env
+ls $var1
+ls $var2 $var3
+ls $var
+$var4 $var5
+$VAR6 $551
+./printFun $551 $var7
+set var7 I am replacing var7 with new value!
+$VAR6 $_559_ $var7 $var
+set var8 ./testcases/printfDir I am testing /testcases/printfDir!
+$var8
+
+set PATH none
+env

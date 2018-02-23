@@ -1,0 +1,7 @@
+set myProgram ./testcases/step4/printDirStep4
+set inFile ./testcases/step4/input1.txt
+set outFile ./testcases/combined/output1.txt
+export myProgram
+export pipe
+$myProgram<$inFile| 2>./testcases/combined/outerr1.txt>$outFile $myProgram
+env
